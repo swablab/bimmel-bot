@@ -11,32 +11,38 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-var myHandler handler.MessageHandler
+var messageHandler handler.MessageHandler
 
 func main() {
 	var err error
-	myHandler, err = handler.NewMqttHandler(config.MqttConfiguration)
+
+	//build MessageHandler
+	messageHandler, err = handler.NewMqttMessageHandler(config.MqttConfiguration)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer myHandler.Close()
+	defer messageHandler.Close()
+	log.Println("Successfully created MessageHandler")
 
-	dg, err := discordgo.New("Bot " + config.DiscordConfiguration.Token)
+	//build discord api
+	discord, err := discordgo.New("Bot " + config.DiscordConfiguration.Token)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer dg.Close()
-	dg.AddHandler(messageCreate)
+	defer discord.Close()
 
-	err = dg.Open()
+	discord.AddHandler(messageCreate)
+
+	err = discord.Open()
 	if err != nil {
 		log.Fatalf("error opening connection %s", err)
 		return
 	}
+	log.Println("Successfully connected to the discord API")
 
 	// Wait here until CTRL-C or other term signal is received.
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 }
 
@@ -44,5 +50,5 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
-	go myHandler.Message(m.Content)
+	go messageHandler.SendMessage(m.Content)
 }

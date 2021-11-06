@@ -13,7 +13,7 @@ type mqttHandler struct {
 	mqttClient mqtt.Client
 }
 
-func (handler *mqttHandler) Message(message string) {
+func (handler *mqttHandler) SendMessage(message string) {
 	handler.mqttClient.Publish("discord", 2, false, message)
 }
 
@@ -21,8 +21,8 @@ func (handler *mqttHandler) Close() {
 	handler.mqttClient.Disconnect(2)
 }
 
-//NewMqttHandler Factory function for mqtt with authentication
-func NewMqttHandler(cfg config.MqttConfig) (*mqttHandler, error) {
+//NewMqttMessageHandler Factory function for mqtt with authentication
+func NewMqttMessageHandler(cfg config.MqttConfig) (*mqttHandler, error) {
 	handler := new(mqttHandler)
 	handler.config = cfg
 

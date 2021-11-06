@@ -1,6 +1,6 @@
 package handler
 
 type MessageHandler interface {
-	Message(string)
+	SendMessage(string)
 	Close()
 }
