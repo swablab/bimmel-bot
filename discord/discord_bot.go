@@ -17,10 +17,10 @@ type discordBot struct {
 }
 
 type DiscordServer struct {
-	channelId       string
-	createdChannel  bool
-	categoryId      string
-	createdCategory bool
+	ChannelID       string
+	CreatedChannel  bool
+	CategoryID      string
+	CreatedCategory bool
 }
 
 func NewRingBot(config *config.DiscordConfig, messageHandler handler.MessageHandler) (*discordBot, error) {
@@ -50,12 +50,14 @@ func (bot *discordBot) onMessageCreate(s *discordgo.Session, m *discordgo.Messag
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
-	go bot.messageHandler.SendMessage(m.Content)
-	go func() {
-		time.Sleep(2 * time.Second)
-		s.ChannelMessageDelete(m.ChannelID, m.ID)
-	}()
-
+	server, exists := bot.activeServers[m.GuildID]
+	if exists && m.ChannelID == server.ChannelID {
+		go bot.messageHandler.SendMessage(m.Content)
+		go func() {
+			time.Sleep(2 * time.Second)
+			s.ChannelMessageDelete(m.ChannelID, m.ID)
+		}()
+	}
 }
 
 func (bot *discordBot) OnGuildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
@@ -66,32 +68,32 @@ func (bot *discordBot) OnGuildCreate(s *discordgo.Session, event *discordgo.Guil
 	server := new(DiscordServer)
 	for _, channel := range event.Guild.Channels {
 		if channel.Name == config.DiscordConfiguration.ChannelName && channel.Type == discordgo.ChannelTypeGuildText {
-			server.channelId = channel.ID
-			server.createdChannel = false
+			server.ChannelID = channel.ID
+			server.CreatedChannel = false
 
 		} else if channel.Name == config.DiscordConfiguration.ChannelCategory && channel.Type == discordgo.ChannelTypeGuildCategory {
-			server.categoryId = channel.ID
-			server.createdCategory = false
+			server.CategoryID = channel.ID
+			server.CreatedCategory = false
 		}
 	}
 
-	if server.categoryId == "" {
+	if server.CategoryID == "" {
 		category, err := s.GuildChannelCreate(event.Guild.ID, bot.config.ChannelCategory, discordgo.ChannelTypeGuildCategory)
 		if err == nil {
-			server.categoryId = category.ID
-			server.createdCategory = true
+			server.CategoryID = category.ID
+			server.CreatedCategory = true
 		}
 	}
 
-	if server.channelId == "" {
+	if server.ChannelID == "" {
 		channel, err := s.GuildChannelCreate(event.Guild.ID, bot.config.ChannelName, discordgo.ChannelTypeGuildText)
 		if err == nil {
-			server.channelId = channel.ID
-			server.createdChannel = true
+			server.ChannelID = channel.ID
+			server.CreatedChannel = true
 		}
 
 		edit := new(discordgo.ChannelEdit)
-		edit.ParentID = server.categoryId
+		edit.ParentID = server.CategoryID
 		s.ChannelEditComplex(channel.ID, edit)
 	}
 
@@ -100,7 +102,7 @@ func (bot *discordBot) OnGuildCreate(s *discordgo.Session, event *discordgo.Guil
 	msg := new(discordgo.MessageSend)
 	msg.Content = "Bitte hier klingeln (einfach eine Nachricht schreiben)"
 
-	_, err := s.ChannelMessageSendComplex(server.channelId, msg)
+	_, err := s.ChannelMessageSendComplex(server.ChannelID, msg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -108,12 +110,12 @@ func (bot *discordBot) OnGuildCreate(s *discordgo.Session, event *discordgo.Guil
 
 func (bot *discordBot) cleanupChannels() {
 	for _, server := range bot.activeServers {
-		if server.createdChannel {
-			bot.discordSession.ChannelDelete(server.channelId)
+		if server.CreatedChannel {
+			bot.discordSession.ChannelDelete(server.ChannelID)
 
 		}
-		if server.createdCategory {
-			bot.discordSession.ChannelDelete(server.categoryId)
+		if server.CreatedCategory {
+			bot.discordSession.ChannelDelete(server.CategoryID)
 		}
 	}
 }
