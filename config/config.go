@@ -9,6 +9,7 @@ type MqttConfig struct {
 	Host                         string
 	Username                     string
 	Password                     string
+	Topic                        string
 	AllowAnonymousAuthentication bool
 }
 
@@ -28,6 +29,7 @@ var MqttConfiguration = MqttConfig{
 	Host:                         getEnv("MQTT_HOST", "192.168.0.94:1883"),
 	Username:                     getEnv("MQTT_USER", "mqtt"),
 	Password:                     getEnv("MQTT_PASS", "mqtt"),
+	Topic:                        getEnv("MQTT_TOPIC", "swablab-discord-bot"),
 	AllowAnonymousAuthentication: getEnvBool("MQTT_ANONYMOUS", false),
 }
 

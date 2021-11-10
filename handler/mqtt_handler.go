@@ -14,7 +14,7 @@ type mqttHandler struct {
 }
 
 func (handler *mqttHandler) SendMessage(message string) {
-	handler.mqttClient.Publish("discord", 2, false, message)
+	handler.mqttClient.Publish(handler.config.Topic, 2, false, message)
 }
 
 func (handler *mqttHandler) Close() {
