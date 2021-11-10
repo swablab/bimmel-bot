@@ -43,6 +43,6 @@ func NewMqttMessageHandler(cfg config.MqttConfig) (*mqttHandler, error) {
 		return nil, token.Error()
 	}
 
-	log.Print("successfully connected to mqtt-broker")
+	log.Print("Successfully connected to mqtt-broker")
 	return handler, nil
 }

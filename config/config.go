@@ -13,11 +13,15 @@ type MqttConfig struct {
 }
 
 type DiscordConfig struct {
-	Token string
+	ChannelName     string
+	ChannelCategory string
+	Token           string
 }
 
 var DiscordConfiguration = DiscordConfig{
-	Token: getEnv("DISCORD_TOKEN", ""),
+	Token:           getEnv("DISCORD_API_TOKEN", ""),
+	ChannelName:     getEnv("DISCORD_CHANNEL_NAME", "klingeln"),
+	ChannelCategory: getEnv("DISCORD_CATEGORY_CATEGORY", "Bots"),
 }
 
 var MqttConfiguration = MqttConfig{
