@@ -9,14 +9,16 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+var componentBellId string = "swablab-enty-bell"
+
 type discordBot struct {
 	messageHandler handler.MessageHandler
 	config         *config.DiscordConfig
-	activeServers  map[string]*DiscordServer
+	activeServers  map[string]*discordServer
 	discordSession *discordgo.Session
 }
 
-type DiscordServer struct {
+type discordServer struct {
 	ChannelID       string
 	CreatedChannel  bool
 	CategoryID      string
@@ -27,7 +29,7 @@ func NewRingBot(config *config.DiscordConfig, messageHandler handler.MessageHand
 	bot := new(discordBot)
 	bot.config = config
 	bot.messageHandler = messageHandler
-	bot.activeServers = make(map[string]*DiscordServer)
+	bot.activeServers = make(map[string]*discordServer)
 
 	discordSession, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
@@ -36,7 +38,8 @@ func NewRingBot(config *config.DiscordConfig, messageHandler handler.MessageHand
 	bot.discordSession = discordSession
 
 	bot.discordSession.AddHandler(bot.onMessageCreate)
-	bot.discordSession.AddHandler(bot.OnGuildCreate)
+	bot.discordSession.AddHandler(bot.onGuildCreate)
+	bot.discordSession.AddHandler(bot.onInteractionCreate)
 
 	err = bot.discordSession.Open()
 	if err != nil {
@@ -44,6 +47,10 @@ func NewRingBot(config *config.DiscordConfig, messageHandler handler.MessageHand
 	}
 
 	return bot, nil
+}
+
+func (bot *discordBot) Close() {
+	bot.cleanupServers()
 }
 
 func (bot *discordBot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -60,13 +67,35 @@ func (bot *discordBot) onMessageCreate(s *discordgo.Session, m *discordgo.Messag
 	}
 }
 
-func (bot *discordBot) OnGuildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
+func (bot *discordBot) onGuildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
 	if event.Guild.Unavailable {
 		return
 	}
+	server, err := bot.prepareGuild(event.Guild)
+	if err != nil {
+		log.Print("could not prepare discord server", err)
+		return
+	}
 
-	server := new(DiscordServer)
-	for _, channel := range event.Guild.Channels {
+	ringMessage := createRingMessage()
+	_, err = s.ChannelMessageSendComplex(server.ChannelID, ringMessage)
+	if err != nil {
+		log.Print(err)
+	}
+}
+
+func (bot *discordBot) onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if i.Type == discordgo.InteractionMessageComponent && i.MessageComponentData().CustomID == componentBellId {
+		bot.messageHandler.SendMessage(i.Interaction.Member.User.Username)
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseUpdateMessage,
+		})
+	}
+}
+
+func (bot *discordBot) prepareGuild(guild *discordgo.Guild) (*discordServer, error) {
+	server := new(discordServer)
+	for _, channel := range guild.Channels {
 		if channel.Name == config.DiscordConfiguration.ChannelName && channel.Type == discordgo.ChannelTypeGuildText {
 			server.ChannelID = channel.ID
 			server.CreatedChannel = false
@@ -78,37 +107,31 @@ func (bot *discordBot) OnGuildCreate(s *discordgo.Session, event *discordgo.Guil
 	}
 
 	if server.CategoryID == "" {
-		category, err := s.GuildChannelCreate(event.Guild.ID, bot.config.ChannelCategory, discordgo.ChannelTypeGuildCategory)
-		if err == nil {
-			server.CategoryID = category.ID
-			server.CreatedCategory = true
+		category, err := bot.discordSession.GuildChannelCreate(guild.ID, bot.config.ChannelCategory, discordgo.ChannelTypeGuildCategory)
+		if err != nil {
+			return nil, err
 		}
+		server.CategoryID = category.ID
+		server.CreatedCategory = true
 	}
 
 	if server.ChannelID == "" {
-		channel, err := s.GuildChannelCreate(event.Guild.ID, bot.config.ChannelName, discordgo.ChannelTypeGuildText)
+		channel, err := bot.discordSession.GuildChannelCreate(guild.ID, bot.config.ChannelName, discordgo.ChannelTypeGuildText)
 		if err == nil {
-			server.ChannelID = channel.ID
-			server.CreatedChannel = true
+			return nil, err
 		}
+		server.ChannelID = channel.ID
+		server.CreatedChannel = true
 
 		edit := new(discordgo.ChannelEdit)
 		edit.ParentID = server.CategoryID
-		s.ChannelEditComplex(channel.ID, edit)
+		bot.discordSession.ChannelEditComplex(channel.ID, edit)
 	}
-
-	bot.activeServers[event.Guild.ID] = server
-
-	msg := new(discordgo.MessageSend)
-	msg.Content = "Bitte hier klingeln (einfach eine Nachricht schreiben)"
-
-	_, err := s.ChannelMessageSendComplex(server.ChannelID, msg)
-	if err != nil {
-		log.Fatal(err)
-	}
+	bot.activeServers[guild.ID] = server
+	return server, nil
 }
 
-func (bot *discordBot) cleanupChannels() {
+func (bot *discordBot) cleanupServers() {
 	for _, server := range bot.activeServers {
 		if server.CreatedChannel {
 			bot.discordSession.ChannelDelete(server.ChannelID)
@@ -120,6 +143,20 @@ func (bot *discordBot) cleanupChannels() {
 	}
 }
 
-func (bot *discordBot) Close() {
-	bot.cleanupChannels()
+func createRingMessage() *discordgo.MessageSend {
+	ringMessage := new(discordgo.MessageSend)
+	ringMessage.Content = "Bitte hier klingeln"
+	ringMessage.Components = []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label:    "Klingeln",
+					Style:    discordgo.SuccessButton,
+					Disabled: false,
+					CustomID: componentBellId,
+				},
+			},
+		},
+	}
+	return ringMessage
 }
