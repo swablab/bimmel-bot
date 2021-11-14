@@ -22,7 +22,7 @@ type DiscordConfig struct {
 var DiscordConfiguration = DiscordConfig{
 	Token:           getEnv("DISCORD_API_TOKEN", ""),
 	ChannelName:     getEnv("DISCORD_CHANNEL_NAME", "klingeln"),
-	ChannelCategory: getEnv("DISCORD_CATEGORY_CATEGORY", "Bots"),
+	ChannelCategory: getEnv("DISCORD_CATEGORY_NAME", "Bots"),
 }
 
 var MqttConfiguration = MqttConfig{
