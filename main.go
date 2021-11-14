@@ -16,7 +16,7 @@ func main() {
 	var err error
 
 	//build MessageHandler
-	messageHandler, err = handler.NewDummyMessageHandler() //handler.NewMqttMessageHandler(config.MqttConfiguration)
+	messageHandler, err = handler.NewMqttMessageHandler(config.MqttConfiguration)
 	if err != nil {
 		log.Fatal(err)
 	}
