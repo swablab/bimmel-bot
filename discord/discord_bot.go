@@ -117,15 +117,18 @@ func (bot *discordBot) prepareGuild(guild *discordgo.Guild) (*discordServer, err
 
 	if server.ChannelID == "" {
 		channel, err := bot.discordSession.GuildChannelCreate(guild.ID, bot.config.ChannelName, discordgo.ChannelTypeGuildText)
-		if err == nil {
+		if err != nil {
 			return nil, err
 		}
 		server.ChannelID = channel.ID
 		server.CreatedChannel = true
-
 		edit := new(discordgo.ChannelEdit)
 		edit.ParentID = server.CategoryID
-		bot.discordSession.ChannelEditComplex(channel.ID, edit)
+
+		_, err = bot.discordSession.ChannelEditComplex(channel.ID, edit)
+		if err != nil {
+			return nil, err
+		}
 	}
 	bot.activeServers[guild.ID] = server
 	return server, nil
